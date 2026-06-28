@@ -1,0 +1,23 @@
+{
+  "name": "ui-automation-project",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:report": "npx playwright show-report",
+    "test:header": "npx playwright test tests/header.spec.ts",
+    "test:body": "npx playwright test tests/body.spec.ts",
+    "test:footer": "npx playwright test tests/footer.spec.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@types/node": "^26.0.1",
+    "typescript": "^6.0.3"
+  }
+}

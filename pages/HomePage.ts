@@ -92,11 +92,14 @@ export class HomePage extends BasePage {
     await link.first().click();
   }
 
-  /** Hover over a top-level nav item to reveal its dropdown. */
+  /** Click a top-level nav item to open its dropdown (click-activated chevron menus). */
   async hoverHeaderMenu(menuText: string): Promise<void> {
-    const trigger = getLocator(this.page, this.xpNavAnchorByText, menuText);
+    // Exclude footer ancestors; use normalize-space(.) to match text across child elements
+    const trigger = this.page.locator(
+      `xpath=//a[not(ancestor::footer) and normalize-space(.)='${menuText}']`
+    );
     await trigger.first().waitFor({ state: 'visible', timeout: 8000 });
-    await trigger.first().hover();
+    await trigger.first().click();
   }
 
   /** Click a submenu link (visible after hovering the parent). */
@@ -145,59 +148,36 @@ export class HomePage extends BasePage {
 
   // ── Carousel Methods ───────────────────────────────────────────────────────
 
+  /** Return the hero carousel slide-status text, e.g. "slide 1 of 3". */
+  async getHeroCarouselStatusText(): Promise<string> {
+    const status = this.page.getByText(/slide\s+\d+\s+of\s+\d+/i).first();
+    await status.waitFor({ state: 'visible', timeout: 8000 });
+    return (await status.textContent())?.trim() ?? '';
+  }
+
   /** Click the "Show Next Slide" carousel button. */
   async clickCarouselNext(): Promise<void> {
-    try {
-      // First, scroll to find the carousel
-      const btn = getLocator(this.page, this.xpCarouselBtnByText, 'Show Next Slide');
-      await btn.waitFor({ state: 'visible', timeout: 3000 });
-      await btn.click();
-    } catch {
-      try {
-        // Fallback: try to find any button with "Next" text
-        const fallback = this.page.locator('xpath=//button[contains(normalize-space(text()),"Next")]').first();
-        await fallback.waitFor({ state: 'visible', timeout: 2000 });
-        await fallback.click();
-      } catch {
-        // Carousel might not exist - that's okay
-      }
-    }
+    const btn = this.page.getByRole('button', { name: 'Show Next Slide' }).first();
+    await btn.scrollIntoViewIfNeeded();
+    await btn.waitFor({ state: 'visible', timeout: 8000 });
+    await btn.click();
   }
 
   /** Click the "Show Previous Slide" carousel button. */
   async clickCarouselPrev(): Promise<void> {
-    try {
-      const btn = getLocator(this.page, this.xpCarouselBtnByText, 'Show Previous Slide');
-      await btn.waitFor({ state: 'visible', timeout: 3000 });
-      await btn.click();
-    } catch {
-      try {
-        // Fallback: try to find any button with "Previous" text
-        const fallback = this.page.locator('xpath=//button[contains(normalize-space(text()),"Previous")]').first();
-        await fallback.waitFor({ state: 'visible', timeout: 2000 });
-        await fallback.click();
-      } catch {
-        // Carousel might not exist - that's okay
-      }
-    }
+    const btn = this.page.getByRole('button', { name: 'Show Previous Slide' }).first();
+    await btn.scrollIntoViewIfNeeded();
+    await btn.waitFor({ state: 'visible', timeout: 8000 });
+    await btn.click();
   }
 
   // ── Private Wealth Methods ─────────────────────────────────────────────────
 
   /** Scroll to the Private Wealth section. */
   async scrollToPrivateWealth(): Promise<void> {
-    // Just scroll down - don't try to find specific section
-    try {
-      const scrollTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
-      for (let i = 0; i < 5; i++) {
-        if (!this.page.isClosed?.()) {
-          this.page.evaluate(() => window.scrollBy(0, 300)).catch(() => {});
-          await Promise.race([this.page.waitForTimeout(100), scrollTimeout]).catch(() => {});
-        }
-      }
-    } catch {
-      // Silently continue
-    }
+    const sectionMarker = this.page.getByText('Private wealth', { exact: true }).first();
+    await sectionMarker.waitFor({ state: 'attached', timeout: 8000 });
+    await sectionMarker.scrollIntoViewIfNeeded();
   }
 
   /** Click the first private wealth featured link by href fragment (e.g. "breit.com"). */
@@ -211,50 +191,41 @@ export class HomePage extends BasePage {
 
   /** Scroll to the Featured Stories section. */
   async scrollToFeaturedStories(): Promise<void> {
-    // Just scroll down - don't try to find specific section
-    try {
-      const scrollTimeout = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
-      for (let i = 0; i < 10; i++) {
-        if (!this.page.isClosed?.()) {
-          this.page.evaluate(() => window.scrollBy(0, 300)).catch(() => {});
-          await Promise.race([this.page.waitForTimeout(100), scrollTimeout]).catch(() => {});
-        }
-      }
-    } catch {
-      // Silently continue
-    }
+    const heading = this.page.getByRole('heading', { name: /Featured Stories/i }).first();
+    await heading.waitFor({ state: 'attached', timeout: 8000 });
+    await heading.scrollIntoViewIfNeeded();
   }
 
   /** Return the Featured Stories section heading locator. */
   async getFeaturedStoriesHeading(): Promise<Locator> {
-    return getLocator(this.page, this.xpTextContaining, 'Featured Stories');
+    return this.page.getByRole('heading', { name: /Featured Stories/i }).first();
   }
 
   /** Story cards – `<article>` elements in the featured/stories/insights section. */
   async getStoryCards(): Promise<Locator> {
     return this.page.locator(
-      'xpath=//*[contains(@class,"featured") or contains(@class,"stories") or contains(@class,"insights")]//article'
+      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article'
     );
   }
 
   /** Story images – `<img>` elements in the featured/stories/insights section. */
   async getStoryImages(): Promise<Locator> {
     return this.page.locator(
-      'xpath=//*[contains(@class,"featured") or contains(@class,"stories") or contains(@class,"insights")]//img'
+      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//img'
     );
   }
 
   /** Story dates – `<time>` or date-classed elements in the featured/stories section. */
   async getStoryDates(): Promise<Locator> {
     return this.page.locator(
-      'xpath=//*[contains(@class,"featured") or contains(@class,"stories") or contains(@class,"insights")]//time | //*[contains(@class,"featured") or contains(@class,"stories")]//*[contains(@class,"date")]'
+      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//time'
     );
   }
 
   /** Story insight links inside the featured stories section. */
   async getStoryLinks(): Promise<Locator> {
     return this.page.locator(
-      'xpath=//*[contains(@class,"featured") or contains(@class,"stories") or contains(@class,"insights")]//a[contains(@href,"/insights/")]'
+      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//a[contains(@href,"/insights/article/")]'
     );
   }
 
@@ -286,20 +257,21 @@ export class HomePage extends BasePage {
 
   /** Select a country by its display label. */
   async selectCountry(countryName: string): Promise<void> {
-    // This is a custom dropdown component - click the hidden input to reveal options
-    const countryInput = this.page.locator(
-      'xpath=//*[contains(@name,"country")][@type="text"]'
+    // The actual input is aria-hidden; the visible control is the combobox wrapper.
+    const countryDropdown = this.page.locator(
+      'xpath=//*[contains(@name,"country")][@type="text"]/ancestor::div[@role="combobox"][1]'
     ).first();
-    
-    // Click to open the dropdown
-    await countryInput.click();
+
+    await countryDropdown.waitFor({ state: 'visible', timeout: 8000 });
+    await countryDropdown.click();
     await this.page.waitForTimeout(300);
-    
-    // Look for the country option in the dropdown menu
+
+    // Select the visible option label from the custom dropdown list.
     const option = this.page.locator(
-      `xpath=//*[contains(@role,"option") or @class*="option" or @class*="item"][contains(normalize-space(text()),"${countryName}")]`
+      `xpath=//span[contains(@class,"bx-dropdown-option__label") and normalize-space(text())="${countryName}"]`
     ).first();
-    
+
+    await option.waitFor({ state: 'visible', timeout: 8000 });
     await option.click();
     await this.page.waitForTimeout(300);
   }

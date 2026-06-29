@@ -13,7 +13,9 @@ test.describe('Footer Tests', () => {
   /**
    * TC_FTR_001: Validate Footer Form
    * - Scroll to footer form
-   * - Fill mandatory fields
+   * - Leave one mandatory field blank and submit
+   * - Verify required field validation message appears
+   * - Fill all fields correctly
    * - Verify fields accept input
    * - Do NOT submit
    */
@@ -21,16 +23,31 @@ test.describe('Footer Tests', () => {
     // Scroll to footer form
     await homePage.scrollToFooterForm();
 
-    // Fill mandatory fields
-    await homePage.fillFormField('Email Address *', 'test@example.com');
     await homePage.fillFormField('First Name *', 'Test');
     await homePage.fillFormField('Last Name *', 'User');
     await homePage.fillFormField('Company', 'Acme Corp');
 
-    // Verify fields have the input values
+    // Submit with email left blank to trigger required-field validation
+    await homePage.triggerCountryValidation();
+
     const emailField = page.locator('xpath=//input[@placeholder="Email Address *"]').first();
+    await expect
+      .poll(async () => emailField.evaluate((element) => (element as HTMLInputElement).validationMessage))
+      .toBe('Please fill out this field.');
+    await expect(emailField).toHaveAttribute('data-error', 'Please fill out this field.');
+
+    // Fill the missing required field after validation is shown
+    await homePage.fillFormField('Email Address *', 'test@example.com');
+    await homePage.selectCountry('India');
+    await homePage.checkConsentCheckbox();
+
+    // Verify fields have the input values
     const firstNameField = page.locator('xpath=//input[@placeholder="First Name *"]').first();
     const lastNameField = page.locator('xpath=//input[@placeholder="Last Name *"]').first();
+    const countryDropdown = page.locator(
+      'xpath=//*[contains(@name,"country")][@type="text"]/ancestor::div[@role="combobox"][1]'
+    ).first();
+    const consentCheckbox = page.locator('xpath=//input[@type="checkbox"]').first();
 
     const email = await emailField.inputValue();
     const firstName = await firstNameField.inputValue();
@@ -39,6 +56,8 @@ test.describe('Footer Tests', () => {
     expect(email).toBe('test@example.com');
     expect(firstName).toBe('Test');
     expect(lastName).toBe('User');
+    await expect(countryDropdown).toContainText('India');
+    await expect(consentCheckbox).toBeChecked();
 
     // Verify form is still on page (not submitted)
     expect(page.url()).toContain('blackstone.com');
@@ -78,26 +97,33 @@ test.describe('Footer Tests', () => {
     // Scroll to footer
     await homePage.scrollToFooter();
 
-    // Get all visible footer links
-    const footerLinks = page.locator('xpath=//footer//a[@href]');
+    // Get footer navigation/action links, excluding the footer branding home link
+    const footerLinks = page.locator(
+      'xpath=//footer//a[@href and normalize-space(text())!="" and not(@aria-label="Blackstone home")]'
+    );
     await footerLinks.first().waitFor({ state: 'visible', timeout: 10000 });
     const linkCount = await footerLinks.count();
     expect(linkCount).toBeGreaterThan(0);
 
-    // Pick the first footer link that points to a Blackstone page (internal link)
+    // Pick the first visible footer text link that navigates to a real destination
     let targetHref: string | null = null;
     let targetIndex = 0;
 
     for (let i = 0; i < linkCount; i++) {
       const href = await footerLinks.nth(i).getAttribute('href');
-      if (href && href.includes('blackstone.com') && !href.includes('#')) {
+      if (!href || href === '#' || href.startsWith('#')) {
+        continue;
+      }
+
+      const linkText = (await footerLinks.nth(i).textContent())?.trim();
+      if (linkText) {
         targetHref = href;
         targetIndex = i;
         break;
       }
     }
 
-    // Fallback: use The Firm footer link
+    // Fallback: use a known footer text link
     if (!targetHref) {
       const firmLink = page.locator("xpath=//footer//a[normalize-space(text())='The Firm']");
       if (await firmLink.count() > 0) {
@@ -115,6 +141,11 @@ test.describe('Footer Tests', () => {
     // Verify destination page loaded
     expect(page.url()).toContain('blackstone.com');
     await expect(page.locator("xpath=//body")).toBeVisible();
+
+    // Return to the homepage using the Blackstone logo
+    await homePage.clickLogoToHome();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page).toHaveURL(/blackstone\.com\/?$/);
   });
 
 });

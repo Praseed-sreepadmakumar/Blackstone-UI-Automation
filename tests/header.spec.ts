@@ -65,20 +65,16 @@ test.describe('Header Navigation Tests', () => {
    * - Click Blackstone logo → returns to homepage
    */
   test('TC_HDR_002: Validate Header Dropdown Navigation', async ({ page }) => {
-    // Hover over "The Firm" which has a dropdown
+    // Click "The Firm" to open its dropdown (chevron indicates click-activated)
     await homePage.hoverHeaderMenu('The Firm');
-
-    // Verify dropdown is displayed
-    const dropdown = page.locator(
-      "xpath=//nav//*[contains(@class,'dropdown') or contains(@class,'sub') or contains(@class,'flyout') or contains(@class,'menu-open')]"
-    ).first();
 
     // Wait briefly for dropdown animation
     await page.waitForTimeout(800);
 
     // Click a submenu item — "Our People" is under "The Firm"
+    // Exclude footer ancestors to avoid matching the identical footer link
     const submenuLink = page.locator(
-      "xpath=//a[normalize-space(text())='Our People']"
+      "xpath=//a[not(ancestor::footer) and normalize-space(.)='Our People']"
     );
     await submenuLink.waitFor({ state: 'visible', timeout: 8000 });
     await submenuLink.click();

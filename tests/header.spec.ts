@@ -58,33 +58,54 @@ test.describe('Header Navigation Tests', () => {
 
   /**
    * TC_HDR_002: Validate Header Dropdown Navigation
-   * - Hover over a header menu with dropdown
-   * - Verify dropdown appears
-   * - Click a submenu item
-   * - Verify destination page
+   * - Hover over first header menu ("The Firm") → dropdown appears
+   * - Click submenu item "Our People" → destination page loads
+   * - Click Blackstone logo → returns to homepage
+   * - Hover over second header menu ("What We Do") → dropdown appears
+   * - Click submenu item "Real Estate" → destination page loads
    * - Click Blackstone logo → returns to homepage
    */
   test('TC_HDR_002: Validate Header Dropdown Navigation', async ({ page }) => {
-    // Click "The Firm" to open its dropdown (chevron indicates click-activated)
+    // ── First nav link: "The Firm" ─────────────────────────────────────────
+    // Click "The Firm" to open its dropdown
     await homePage.hoverHeaderMenu('The Firm');
-
-    // Wait briefly for dropdown animation
     await page.waitForTimeout(800);
 
-    // Click a submenu item — "Our People" is under "The Firm"
-    // Exclude footer ancestors to avoid matching the identical footer link
-    const submenuLink = page.locator(
+    // Click submenu item "Our People" (exclude footer to avoid duplicate match)
+    const ourPeopleLink = page.locator(
       "xpath=//a[not(ancestor::footer) and normalize-space(.)='Our People']"
     );
-    await submenuLink.waitFor({ state: 'visible', timeout: 8000 });
-    await submenuLink.click();
+    await ourPeopleLink.waitFor({ state: 'visible', timeout: 8000 });
+    await ourPeopleLink.click();
     await page.waitForLoadState('domcontentloaded');
 
-    // Verify destination page
+    // Verify destination page loaded
     expect(page.url()).toContain('blackstone.com');
     await expect(page.locator("xpath=//h1 | //h2").first()).toBeVisible();
 
-    // Click Blackstone logo to return to homepage
+    // Return to homepage via logo
+    await homePage.clickLogoToHome();
+    await page.waitForLoadState('domcontentloaded');
+    expect(page.url()).toMatch(/blackstone\.com\/?$/);
+
+    // ── Second nav link: "What We Do" ─────────────────────────────────────
+    // Click "What We Do" to open its dropdown
+    await homePage.hoverHeaderMenu('What We Do');
+    await page.waitForTimeout(800);
+
+    // Click submenu item "Real Estate" (exclude footer to avoid duplicate match)
+    const realEstateLink = page.locator(
+      "xpath=//a[not(ancestor::footer) and normalize-space(.)='Real Estate']"
+    );
+    await realEstateLink.waitFor({ state: 'visible', timeout: 8000 });
+    await realEstateLink.click();
+    await page.waitForLoadState('domcontentloaded');
+
+    // Verify destination page loaded
+    expect(page.url()).toContain('blackstone.com');
+    await expect(page.locator("xpath=//h1 | //h2").first()).toBeVisible();
+
+    // Return to homepage via logo
     await homePage.clickLogoToHome();
     await page.waitForLoadState('domcontentloaded');
     expect(page.url()).toMatch(/blackstone\.com\/?$/);

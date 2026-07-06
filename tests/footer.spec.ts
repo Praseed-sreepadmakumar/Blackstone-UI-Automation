@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from '../pages/HomePage.js';
+import { captureStepScreenshot } from '../utils/helpers.js';
+import { XPATHS } from '../utils/xpaths.js';
 
 test.describe('Footer Tests', () => {
 
@@ -19,7 +21,7 @@ test.describe('Footer Tests', () => {
    * - Verify fields accept input
    * - Do NOT submit
    */
-  test('TC_FTR_001: Validate Footer Form', async ({ page }) => {
+  test('TC_FTR_001: Validate Footer Form', async ({ page }, testInfo) => {
     // Scroll to footer form
     await homePage.scrollToFooterForm();
 
@@ -30,7 +32,7 @@ test.describe('Footer Tests', () => {
     // Submit with email left blank to trigger required-field validation
     await homePage.triggerCountryValidation();
 
-    const emailField = page.locator('xpath=//input[@placeholder="Email Address *"]').first();
+    const emailField = page.locator(`xpath=${XPATHS.home.emailFieldRequired}`).first();
     await expect
       .poll(async () => emailField.evaluate((element) => (element as HTMLInputElement).validationMessage))
       .toBe('Please fill out this field.');
@@ -40,14 +42,13 @@ test.describe('Footer Tests', () => {
     await homePage.fillFormField('Email Address *', 'test@example.com');
     await homePage.selectCountry('India');
     await homePage.checkConsentCheckbox();
+    await captureStepScreenshot(page, testInfo, 'ftr-001-filled-footer-form', true);
 
     // Verify fields have the input values
-    const firstNameField = page.locator('xpath=//input[@placeholder="First Name *"]').first();
-    const lastNameField = page.locator('xpath=//input[@placeholder="Last Name *"]').first();
-    const countryDropdown = page.locator(
-      'xpath=//*[contains(@name,"country")][@type="text"]/ancestor::div[@role="combobox"][1]'
-    ).first();
-    const consentCheckbox = page.locator('xpath=//input[@type="checkbox"]').first();
+    const firstNameField = page.locator(`xpath=${XPATHS.home.firstNameField}`).first();
+    const lastNameField = page.locator(`xpath=${XPATHS.home.lastNameField}`).first();
+    const countryDropdown = page.locator(`xpath=${XPATHS.home.countryCombobox}`).first();
+    const consentCheckbox = page.locator(`xpath=${XPATHS.home.checkboxFirst}`).first();
 
     const email = await emailField.inputValue();
     const firstName = await firstNameField.inputValue();
@@ -58,6 +59,7 @@ test.describe('Footer Tests', () => {
     expect(lastName).toBe('User');
     await expect(countryDropdown).toContainText('India');
     await expect(consentCheckbox).toBeChecked();
+    await captureStepScreenshot(page, testInfo, 'ftr-001-validation-and-values-confirmed', true);
 
     // Verify form is still on page (not submitted)
     expect(page.url()).toContain('blackstone.com');
@@ -68,24 +70,21 @@ test.describe('Footer Tests', () => {
    * - Scroll to page bottom
    * - Verify Blackstone footer branding / logo is visible
    */
-  test('TC_FTR_002: Validate Footer Branding', async ({ page }) => {
+  test('TC_FTR_002: Validate Footer Branding', async ({ page }, testInfo) => {
     // Scroll to footer
     await homePage.scrollToFooter();
 
     // Verify Blackstone branding text is visible in the footer
-    const footerBrandingText = page.locator(
-      "xpath=//footer//*[contains(normalize-space(text()),'Blackstone') or contains(normalize-space(text()),'blackstone')]"
-    ).first();
+    const footerBrandingText = page.locator(`xpath=${XPATHS.home.footerBrandingText}`).first();
     await footerBrandingText.waitFor({ state: 'visible', timeout: 10000 });
     await expect(footerBrandingText).toBeVisible();
 
     // Also check for logo image in footer if present
-    const footerLogo = page.locator(
-      "xpath=//footer//img[contains(translate(@alt,'abcdefghijklmnopqrstuvwxyz','ABCDEFGHIJKLMNOPQRSTUVWXYZ'),'BLACKSTONE') or contains(@src,'logo') or contains(@src,'blackstone')]"
-    );
+    const footerLogo = page.locator(`xpath=${XPATHS.home.footerLogoImage}`);
     const logoCount = await footerLogo.count();
     // At minimum the text branding must be visible (logo is a bonus)
     expect(await footerBrandingText.isVisible() || logoCount > 0).toBeTruthy();
+    await captureStepScreenshot(page, testInfo, 'ftr-002-footer-branding', true);
   });
 
   /**
@@ -93,19 +92,18 @@ test.describe('Footer Tests', () => {
    * - Click one footer link
    * - Verify destination page loads correctly
    */
-  test('TC_FTR_003: Validate Footer Links', async ({ page }) => {
+  test('TC_FTR_003: Validate Footer Links', async ({ page }, testInfo) => {
     // Scroll to footer
     await homePage.scrollToFooter();
 
     // Get footer navigation/action links, excluding the footer branding home link
-    const footerLinks = page.locator(
-      'xpath=//footer//a[@href and normalize-space(text())!="" and not(@aria-label="Blackstone home")]'
-    );
+    const footerLinks = page.locator(`xpath=${XPATHS.home.footerLinksNavigable}`);
     await footerLinks.first().waitFor({ state: 'visible', timeout: 10000 });
     const linkCount = await footerLinks.count();
     expect(linkCount).toBeGreaterThan(0);
 
-    // Pick the first visible footer text link that navigates to a real destination
+    // Pick the first visible footer text link that navigates to a stable in-site destination.
+    // This avoids flaky external/tabbed links that can resolve to browser error pages.
     let targetHref: string | null = null;
     let targetIndex = 0;
 
@@ -115,8 +113,19 @@ test.describe('Footer Tests', () => {
         continue;
       }
 
+      const normalizedHref = href.trim().toLowerCase();
+      if (
+        normalizedHref.startsWith('javascript:') ||
+        normalizedHref.startsWith('mailto:') ||
+        normalizedHref.startsWith('tel:')
+      ) {
+        continue;
+      }
+
       const linkText = (await footerLinks.nth(i).textContent())?.trim();
-      if (linkText) {
+      const isInSiteLink = normalizedHref.startsWith('/') || normalizedHref.includes('blackstone.com');
+
+      if (linkText && isInSiteLink) {
         targetHref = href;
         targetIndex = i;
         break;
@@ -125,7 +134,7 @@ test.describe('Footer Tests', () => {
 
     // Fallback: use a known footer text link
     if (!targetHref) {
-      const firmLink = page.locator("xpath=//footer//a[normalize-space(text())='The Firm']");
+      const firmLink = page.locator(`xpath=${XPATHS.home.footerFirmLink}`);
       if (await firmLink.count() > 0) {
         targetHref = await firmLink.getAttribute('href');
         await firmLink.click();
@@ -137,10 +146,11 @@ test.describe('Footer Tests', () => {
     }
 
     await page.waitForLoadState('domcontentloaded');
+    await captureStepScreenshot(page, testInfo, 'ftr-003-footer-link-destination', false);
 
     // Verify destination page loaded
-    expect(page.url()).toContain('blackstone.com');
-    await expect(page.locator("xpath=//body")).toBeVisible();
+    await expect(page).toHaveURL(/blackstone\.com\//i);
+    await expect(page.locator(`xpath=${XPATHS.home.bodyElement}`)).toBeVisible();
 
     // Return to the homepage using the Blackstone logo
     await homePage.clickLogoToHome();

@@ -1,5 +1,6 @@
 import { Page } from '@playwright/test';
 import { getLocator } from '../utils/helpers.js';
+import { XPATHS } from '../utils/xpaths.js';
 
 /**
  * BasePage - Base class for all page objects.
@@ -10,15 +11,9 @@ export class BasePage {
   readonly page: Page;
 
   // ── Constants ──────────────────────────────────────────────────────────────
-  private static readonly GOTO_TIMEOUT_MS = 30000;
-  private static readonly OVERLAY_TIMEOUT_MS = 10000;
+  private static readonly GOTO_TIMEOUT_MS = 45000;
+  private static readonly OVERLAY_TIMEOUT_MS = 3000;
   private static readonly OVERLAY_DELAY_MS = 800;
-
-  // ── XPath Templates ────────────────────────────────────────────────────────
-  // Cookie banner: "I Understand" is an <a class="cc-btn cc-dismiss"> link
-  private readonly xpCookieAcceptLink = "//a[normalize-space(text())='PARAM']";
-  // Geo / residency dialog (#dialog-geo): anchor identified by aria-label
-  private readonly xpGeoDialogBtn     = "//a[@aria-label='PARAM']";
 
   constructor(page: Page) {
     this.page = page;
@@ -43,7 +38,7 @@ export class BasePage {
 
   /** Click "I Understand" on the cookie consent banner if it appears. */
   async dismissCookieBanner(): Promise<void> {
-    const link = getLocator(this.page, this.xpCookieAcceptLink, 'I Understand');
+    const link = getLocator(this.page, XPATHS.base.cookieAcceptLink, 'I Understand');
     try {
       await link.waitFor({ state: 'visible', timeout: BasePage.OVERLAY_TIMEOUT_MS });
       await link.click();
@@ -59,7 +54,7 @@ export class BasePage {
    * This dialog only becomes visible AFTER the cookie banner is dismissed.
    */
   async dismissResidencyDialog(): Promise<void> {
-    const link = getLocator(this.page, this.xpGeoDialogBtn, 'I am not a United States Resident');
+    const link = getLocator(this.page, XPATHS.base.geoDialogBtn, 'I am not a United States Resident');
     try {
       await link.waitFor({ state: 'visible', timeout: BasePage.OVERLAY_TIMEOUT_MS });
       await link.click();
@@ -67,5 +62,11 @@ export class BasePage {
     } catch {
       // Geo dialog did not appear – continue
     }
+  }
+
+  /** Best-effort overlay cleanup before clicks that can be blocked by modal backdrops. */
+  async dismissEntryOverlays(): Promise<void> {
+    await this.dismissCookieBanner();
+    await this.dismissResidencyDialog();
   }
 }

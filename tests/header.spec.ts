@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from '../pages/HomePage.js';
+import { captureStepScreenshot } from '../utils/helpers.js';
+import { XPATHS } from '../utils/xpaths.js';
 
 test.describe('Header Navigation Tests', () => {
 
@@ -18,7 +20,7 @@ test.describe('Header Navigation Tests', () => {
    * - Click second header link → destination page loads
    * - Return to homepage
    */
-  test('TC_HDR_001: Validate Header Navigation Links', async ({ page }) => {
+  test('TC_HDR_001: Validate Header Navigation Links', async ({ page }, testInfo) => {
     // Verify all primary header links are visible
     const allLinks = await homePage.getAllHeaderNavLinks();
     const linkCount = await allLinks.count();
@@ -27,12 +29,14 @@ test.describe('Header Navigation Tests', () => {
     for (let i = 0; i < linkCount; i++) {
       await expect(allLinks.nth(i)).toBeVisible();
     }
+    await captureStepScreenshot(page, testInfo, 'hdr-001-header-links-visible', false);
 
     // Click first header link and verify destination
     const firstLinkHref = await allLinks.first().getAttribute('href');
     await allLinks.first().click();
     await page.waitForLoadState('domcontentloaded');
     expect(page.url()).not.toBe('about:blank');
+    await captureStepScreenshot(page, testInfo, 'hdr-001-first-link-destination', false);
 
     // Return to homepage
     await page.goto('/');
@@ -48,6 +52,7 @@ test.describe('Header Navigation Tests', () => {
     await linksAfterReturn.nth(1).click();
     await page.waitForLoadState('domcontentloaded');
     expect(page.url()).not.toBe('about:blank');
+    await captureStepScreenshot(page, testInfo, 'hdr-001-second-link-destination', false);
 
     // Return to homepage
     await page.goto('/');
@@ -65,23 +70,22 @@ test.describe('Header Navigation Tests', () => {
    * - Click submenu item "Real Estate" → destination page loads
    * - Click Blackstone logo → returns to homepage
    */
-  test('TC_HDR_002: Validate Header Dropdown Navigation', async ({ page }) => {
+  test('TC_HDR_002: Validate Header Dropdown Navigation', async ({ page }, testInfo) => {
     // ── First nav link: "The Firm" ─────────────────────────────────────────
     // Click "The Firm" to open its dropdown
     await homePage.hoverHeaderMenu('The Firm');
     await page.waitForTimeout(800);
 
     // Click submenu item "Our People" (exclude footer to avoid duplicate match)
-    const ourPeopleLink = page.locator(
-      "xpath=//a[not(ancestor::footer) and normalize-space(.)='Our People']"
-    );
+    const ourPeopleLink = page.locator(`xpath=${XPATHS.home.ourPeopleLink}`);
     await ourPeopleLink.waitFor({ state: 'visible', timeout: 8000 });
     await ourPeopleLink.click();
     await page.waitForLoadState('domcontentloaded');
 
     // Verify destination page loaded
     expect(page.url()).toContain('blackstone.com');
-    await expect(page.locator("xpath=//h1 | //h2").first()).toBeVisible();
+    await expect(page.locator(`xpath=${XPATHS.home.headerOrSubheading}`).first()).toBeVisible();
+    await captureStepScreenshot(page, testInfo, 'hdr-002-our-people-page', false);
 
     // Return to homepage via logo
     await homePage.clickLogoToHome();
@@ -94,16 +98,15 @@ test.describe('Header Navigation Tests', () => {
     await page.waitForTimeout(800);
 
     // Click submenu item "Real Estate" (exclude footer to avoid duplicate match)
-    const realEstateLink = page.locator(
-      "xpath=//a[not(ancestor::footer) and normalize-space(.)='Real Estate']"
-    );
+    const realEstateLink = page.locator(`xpath=${XPATHS.home.realEstateLink}`);
     await realEstateLink.waitFor({ state: 'visible', timeout: 8000 });
     await realEstateLink.click();
     await page.waitForLoadState('domcontentloaded');
 
     // Verify destination page loaded
     expect(page.url()).toContain('blackstone.com');
-    await expect(page.locator("xpath=//h1 | //h2").first()).toBeVisible();
+    await expect(page.locator(`xpath=${XPATHS.home.headerOrSubheading}`).first()).toBeVisible();
+    await captureStepScreenshot(page, testInfo, 'hdr-002-real-estate-page', false);
 
     // Return to homepage via logo
     await homePage.clickLogoToHome();
@@ -117,7 +120,7 @@ test.describe('Header Navigation Tests', () => {
    * - Search for "Real Estate"
    * - Verify search results count > 0
    */
-  test('TC_HDR_003: Validate Search Functionality', async ({ page }) => {
+  test('TC_HDR_003: Validate Search Functionality', async ({ page }, testInfo) => {
     // Open search
     await homePage.openSearch();
 
@@ -129,12 +132,11 @@ test.describe('Header Navigation Tests', () => {
     expect(page.url()).toContain('blackstone.com');
 
     // Verify result count > 0 — look for result items or count text
-    const resultItems = page.locator(
-      "xpath=//*[contains(@class,'result') or contains(@class,'search-result') or contains(@class,'Result')]//a | //article | //li[contains(@class,'result')]"
-    );
+    const resultItems = page.locator(`xpath=${XPATHS.home.searchResultsItems}`);
     await resultItems.first().waitFor({ state: 'visible', timeout: 15000 });
     const count = await resultItems.count();
     expect(count).toBeGreaterThan(0);
+    await captureStepScreenshot(page, testInfo, 'hdr-003-search-results', true);
   });
 
 });

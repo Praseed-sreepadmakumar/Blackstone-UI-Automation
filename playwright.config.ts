@@ -24,6 +24,7 @@ export default defineConfig({
 
   // ── Execution ──────────────────────────────────────────────────────────────
   fullyParallel: false,  // Prevent simultaneous connections to same site
+  workers: 1,  // Run serially for external-site stability
   retries: 0,  // No retries - ensures fast feedback loop
   reporter: [
     ['html', { outputFolder: 'playwright-report' }],  // HTML report

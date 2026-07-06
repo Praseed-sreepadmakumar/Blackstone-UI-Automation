@@ -1,6 +1,7 @@
 import { Page, Locator } from '@playwright/test';
 import { BasePage } from './BasePage.js';
 import { getLocator, scrollIntoView } from '../utils/helpers.js';
+import { XPATHS } from '../utils/xpaths.js';
 
 /**
  * HomePage - Page Object for Blackstone.com Homepage
@@ -20,42 +21,6 @@ export class HomePage extends BasePage {
   private static readonly CAROUSEL_TIMEOUT_MS = 3000;
   private static readonly ELEMENT_TIMEOUT_MS = 2000;
 
-  // ── XPath Templates ────────────────────────────────────────────────────────
-  // Documentation: Each XPath uses 'PARAM' as placeholder for dynamic values
-
-  // Header – nav toggle (expands the collapsed nav)
-  readonly xpNavToggle             = "//button[contains(@class,'PARAM')]";
-  // Nav links inside the expanded primary nav
-  readonly xpPrimaryNavLink        = "//*[contains(@class,'primary-nav')]//a[normalize-space(text())='PARAM']";
-  // Generic nav anchor by text
-  readonly xpNavAnchorByText       = "//nav//a[normalize-space(text())='PARAM']";
-  // Dropdown sub-menu link by text (visible after hover)
-  readonly xpSubMenuLink           = "//*[contains(@class,'primary-nav__sub')]//a[normalize-space(text())='PARAM']";
-  // Search button – aria-label is exactly "Search the site"
-  readonly xpSearchBtn             = "//button[@aria-label='PARAM']";
-  // Blackstone logo home link
-  readonly xpSiteLogoLink          = "//a[contains(@class,'PARAM')]";
-
-  // Carousel – buttons carry TEXT content (not aria-label)
-  readonly xpCarouselBtnByText     = "//button[normalize-space(text())='PARAM']";
-
-  // Private Wealth – links by href fragment
-  readonly xpLinkByHref            = "//a[contains(@href,'PARAM')]";
-
-  // Featured Stories – generic text search
-  readonly xpTextContaining        = "//*[contains(normalize-space(text()),'PARAM')]";
-
-  // Footer form – inputs by placeholder
-  readonly xpInputByPlaceholder    = "//input[@placeholder='PARAM']";
-  // Country select (matches by partial id/name containing "ountry")
-  readonly xpCountrySelect         = "//select[contains(@id,'PARAM') or contains(@name,'PARAM')]";
-  // Consent checkbox
-  readonly xpCheckboxByType        = "//input[@type='PARAM']";
-
-  // Footer
-  readonly xpFooterLink            = "//footer//a[normalize-space(text())='PARAM']";
-  readonly xpFooterImg             = "//footer//img[contains(@alt,'PARAM')]";
-
   constructor(page: Page) {
     super(page);
   }
@@ -64,7 +29,7 @@ export class HomePage extends BasePage {
 
   /** Expand the navigation by clicking the toggle button (if collapsed). */
   async expandNavigation(): Promise<void> {
-    const toggle = getLocator(this.page, this.xpNavToggle, 'primary-nav__toggle');
+    const toggle = getLocator(this.page, XPATHS.home.navToggle, 'primary-nav__toggle');
     try {
       await toggle.first().waitFor({ state: 'visible', timeout: 5000 });
       await toggle.first().click();
@@ -79,15 +44,13 @@ export class HomePage extends BasePage {
     await this.expandNavigation();
     // Get top-level nav links only (The Firm, What We Do, etc.)
     // Top-level items have href="#" in the inspect output
-    return this.page.locator(
-      'xpath=//*[contains(@class,"primary-nav")]//a[@href="#"]'
-    );
+    return this.page.locator(`xpath=${XPATHS.home.primaryNavTopLevelLinks}`);
   }
 
   /** Click a primary nav link by its visible text. */
   async clickHeaderNavLink(linkText: string): Promise<void> {
     await this.expandNavigation();
-    const link = getLocator(this.page, this.xpPrimaryNavLink, linkText);
+    const link = getLocator(this.page, XPATHS.home.primaryNavLink, linkText);
     await link.first().waitFor({ state: 'visible', timeout: 8000 });
     await link.first().click();
   }
@@ -95,16 +58,14 @@ export class HomePage extends BasePage {
   /** Click a top-level nav item to open its dropdown (click-activated chevron menus). */
   async hoverHeaderMenu(menuText: string): Promise<void> {
     // Exclude footer ancestors; use normalize-space(.) to match text across child elements
-    const trigger = this.page.locator(
-      `xpath=//a[not(ancestor::footer) and normalize-space(.)='${menuText}']`
-    );
+    const trigger = getLocator(this.page, XPATHS.home.hoverMenuTriggerByText, menuText);
     await trigger.first().waitFor({ state: 'visible', timeout: 8000 });
     await trigger.first().click();
   }
 
   /** Click a submenu link (visible after hovering the parent). */
   async clickSubMenuLink(linkText: string): Promise<void> {
-    const link = getLocator(this.page, this.xpSubMenuLink, linkText);
+    const link = getLocator(this.page, XPATHS.home.subMenuLink, linkText);
     await link.first().waitFor({ state: 'visible', timeout: 8000 });
     await link.first().click();
   }
@@ -114,13 +75,11 @@ export class HomePage extends BasePage {
     // Try aria-label first, then fallback to icon button
     let btn;
     try {
-      btn = getLocator(this.page, this.xpSearchBtn, 'Search the site');
+      btn = getLocator(this.page, XPATHS.home.searchBtn, 'Search the site');
       await btn.waitFor({ state: 'visible', timeout: 3000 });
     } catch {
       // Fallback: search button may be icon-based or have different structure
-      btn = this.page.locator(
-        'xpath=//button[contains(@class,"search")] | //button[svg] | //a[@aria-label="Search the site"]'
-      ).first();
+      btn = this.page.locator(`xpath=${XPATHS.home.openSearchFallback}`).first();
       await btn.waitFor({ state: 'visible', timeout: 5000 });
     }
     await btn.click();
@@ -129,9 +88,7 @@ export class HomePage extends BasePage {
 
   /** Type a search term into the search panel and submit. */
   async typeSearch(term: string): Promise<void> {
-    const input = this.page.locator(
-      'xpath=//input[@type="search"] | //input[@type="text"][contains(@class,"search")] | //input[@placeholder="Search"]'
-    ).first();
+    const input = this.page.locator(`xpath=${XPATHS.home.searchInputFallback}`).first();
     await input.waitFor({ state: 'visible', timeout: 10000 });
     await input.fill(term);
     await input.press('Enter');
@@ -139,11 +96,16 @@ export class HomePage extends BasePage {
 
   /** Click the Blackstone logo to navigate back to the homepage. */
   async clickLogoToHome(): Promise<void> {
-    const logo = this.page.locator(
-      'xpath=//header//a[./img] | //a[contains(@class,"site-header__logo")] | //a[contains(@class,"primary-nav__logo")]'
-    ).first();
+    const logo = this.page.locator(`xpath=${XPATHS.home.logoToHome}`).first();
+    await this.dismissEntryOverlays();
     await logo.waitFor({ state: 'visible', timeout: 6000 });
-    await logo.click();
+    try {
+      await logo.click();
+    } catch {
+      // If a late modal backdrop intercepts the click, dismiss overlays and retry once.
+      await this.dismissEntryOverlays();
+      await logo.click({ force: true });
+    }
   }
 
   // ── Carousel Methods ───────────────────────────────────────────────────────
@@ -182,7 +144,7 @@ export class HomePage extends BasePage {
 
   /** Click the first private wealth featured link by href fragment (e.g. "breit.com"). */
   async clickPrivateWealthLink(hrefFragment: string): Promise<void> {
-    const link = getLocator(this.page, this.xpLinkByHref, hrefFragment);
+    const link = getLocator(this.page, XPATHS.home.linkByHref, hrefFragment);
     await scrollIntoView(link.first());
     await link.first().click();
   }
@@ -203,43 +165,35 @@ export class HomePage extends BasePage {
 
   /** Story cards – `<article>` elements in the featured/stories/insights section. */
   async getStoryCards(): Promise<Locator> {
-    return this.page.locator(
-      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article'
-    );
+    return this.page.locator(`xpath=${XPATHS.home.featuredStoriesCards}`);
   }
 
   /** Story images – `<img>` elements in the featured/stories/insights section. */
   async getStoryImages(): Promise<Locator> {
-    return this.page.locator(
-      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//img'
-    );
+    return this.page.locator(`xpath=${XPATHS.home.featuredStoriesImages}`);
   }
 
   /** Story dates – `<time>` or date-classed elements in the featured/stories section. */
   async getStoryDates(): Promise<Locator> {
-    return this.page.locator(
-      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//time'
-    );
+    return this.page.locator(`xpath=${XPATHS.home.featuredStoriesDates}`);
   }
 
   /** Story insight links inside the featured stories section. */
   async getStoryLinks(): Promise<Locator> {
-    return this.page.locator(
-      'xpath=//h2[contains(normalize-space(.),"Featured Stories")]/ancestor::*[self::section or self::div][.//article][1]//article//a[contains(@href,"/insights/article/")]'
-    );
+    return this.page.locator(`xpath=${XPATHS.home.featuredStoriesLinks}`);
   }
 
   // ── Footer Form Methods ────────────────────────────────────────────────────
 
   /** Scroll to the footer email-capture form. */
   async scrollToFooterForm(): Promise<void> {
-    const emailField = getLocator(this.page, this.xpInputByPlaceholder, 'Email Address *');
+    const emailField = getLocator(this.page, XPATHS.home.inputByPlaceholder, 'Email Address *');
     await scrollIntoView(emailField);
   }
 
   /** Fill an input identified by its placeholder attribute. */
   async fillFormField(placeholder: string, value: string): Promise<void> {
-    const field = getLocator(this.page, this.xpInputByPlaceholder, placeholder);
+    const field = getLocator(this.page, XPATHS.home.inputByPlaceholder, placeholder);
     const count = await field.count();
     const fieldToUse = count > 1 ? field.first() : field;
     await fieldToUse.waitFor({ state: 'visible', timeout: 8000 });
@@ -248,9 +202,7 @@ export class HomePage extends BasePage {
 
   /** Click the Submit button to trigger form validation. */
   async triggerCountryValidation(): Promise<void> {
-    const submitBtn = this.page.locator(
-      'xpath=//button[contains(@class,"submit") or normalize-space(text())="Submit"] | //input[@type="submit"]'
-    ).first();
+    const submitBtn = this.page.locator(`xpath=${XPATHS.home.submitButton}`).first();
     await submitBtn.waitFor({ state: 'visible', timeout: 8000 });
     await submitBtn.click();
   }
@@ -258,18 +210,14 @@ export class HomePage extends BasePage {
   /** Select a country by its display label. */
   async selectCountry(countryName: string): Promise<void> {
     // The actual input is aria-hidden; the visible control is the combobox wrapper.
-    const countryDropdown = this.page.locator(
-      'xpath=//*[contains(@name,"country")][@type="text"]/ancestor::div[@role="combobox"][1]'
-    ).first();
+    const countryDropdown = this.page.locator(`xpath=${XPATHS.home.countryCombobox}`).first();
 
     await countryDropdown.waitFor({ state: 'visible', timeout: 8000 });
     await countryDropdown.click();
     await this.page.waitForTimeout(300);
 
     // Select the visible option label from the custom dropdown list.
-    const option = this.page.locator(
-      `xpath=//span[contains(@class,"bx-dropdown-option__label") and normalize-space(text())="${countryName}"]`
-    ).first();
+    const option = getLocator(this.page, XPATHS.home.countryOptionByLabel, countryName).first();
 
     await option.waitFor({ state: 'visible', timeout: 8000 });
     await option.click();
@@ -278,7 +226,7 @@ export class HomePage extends BasePage {
 
   /** Check the first consent checkbox in the footer form. */
   async checkConsentCheckbox(): Promise<void> {
-    const checkbox = getLocator(this.page, this.xpCheckboxByType, 'checkbox');
+    const checkbox = getLocator(this.page, XPATHS.home.checkboxByType, 'checkbox');
     await scrollIntoView(checkbox.first());
     await checkbox.first().check();
   }
@@ -287,26 +235,24 @@ export class HomePage extends BasePage {
 
   /** Scroll to the page footer. */
   async scrollToFooter(): Promise<void> {
-    const footer = this.page.locator('xpath=//footer').first();
+    const footer = this.page.locator(`xpath=${XPATHS.home.footerRoot}`).first();
     await scrollIntoView(footer);
   }
 
   /** Return a Blackstone branding element in the footer (text or logo). */
   async getFooterBranding(): Promise<Locator> {
-    return this.page.locator(
-      'xpath=//footer//*[contains(normalize-space(text()),"Blackstone") or contains(normalize-space(text()),"blackstone")]'
-    ).first();
+    return this.page.locator(`xpath=${XPATHS.home.footerBrandingText}`).first();
   }
 
   /** Click a footer link by its visible text. */
   async clickFooterLink(linkText: string): Promise<void> {
-    const link = getLocator(this.page, this.xpFooterLink, linkText);
+    const link = getLocator(this.page, XPATHS.home.footerLinkByText, linkText);
     await scrollIntoView(link);
     await link.click();
   }
 
   /** Return the first anchor in the footer. */
   async getFirstFooterLink(): Promise<Locator> {
-    return this.page.locator('xpath=//footer//a[@href]').first();
+    return this.page.locator(`xpath=${XPATHS.home.footerAnyHref}`).first();
   }
 }

@@ -1,4 +1,4 @@
-import { Page, Locator } from '@playwright/test';
+import { Page, Locator, TestInfo } from '@playwright/test';
 
 /**
  * Replaces the literal string PARAM in an XPath template with the
@@ -55,4 +55,33 @@ export async function scrollIntoView(locator: Locator): Promise<void> {
     // If scrolling fails (e.g., page closed), silently continue
     // This allows tests to proceed even if specific elements aren't found
   }
+}
+
+/**
+ * Capture and attach a screenshot to the Playwright report.
+ * Uses a sanitized name so artifacts are easy to scan per test step.
+ */
+export async function captureStepScreenshot(
+  page: Page,
+  testInfo: TestInfo,
+  stepName: string,
+  fullPage = true
+): Promise<void> {
+  const readableStepName = stepName
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  const screenshotIndex = testInfo.attachments.filter(
+    (attachment) => attachment.contentType === 'image/png'
+  ).length + 1;
+
+  const attachmentLabel = `Screenshot ${screenshotIndex}: ${readableStepName}`;
+
+  const image = await page.screenshot({ fullPage });
+  await testInfo.attach(attachmentLabel, {
+    body: image,
+    contentType: 'image/png'
+  });
 }

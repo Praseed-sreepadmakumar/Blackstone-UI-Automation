@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { HomePage } from '../pages/HomePage.js';
+import { captureStepScreenshot } from '../utils/helpers.js';
+import { XPATHS } from '../utils/xpaths.js';
 
 test.describe('Body Content Tests', () => {
 
@@ -16,14 +18,16 @@ test.describe('Body Content Tests', () => {
    * - Click left (prev) arrow once
    * - Carousel navigates correctly, images change without errors
    */
-  test('TC_BODY_001: Validate Hero Carousel', async ({ page }) => {
+  test('TC_BODY_001: Validate Hero Carousel', async ({ page }, testInfo) => {
     const initialStatus = await homePage.getHeroCarouselStatusText();
+    await captureStepScreenshot(page, testInfo, 'body-001-initial-carousel-state', false);
 
     await homePage.clickCarouselNext();
     await expect
       .poll(async () => homePage.getHeroCarouselStatusText())
       .not.toBe(initialStatus);
     const afterFirstNext = await homePage.getHeroCarouselStatusText();
+    await captureStepScreenshot(page, testInfo, 'body-001-after-first-next', false);
 
     await homePage.clickCarouselNext();
     await expect
@@ -39,6 +43,7 @@ test.describe('Body Content Tests', () => {
     expect(initialStatus).not.toBe(afterFirstNext);
     expect(afterFirstNext).not.toBe(afterSecondNext);
     expect(page.url()).toContain('blackstone.com');
+    await captureStepScreenshot(page, testInfo, 'body-001-final-carousel-state', false);
   });
 
   /**
@@ -48,7 +53,7 @@ test.describe('Body Content Tests', () => {
    * - Verify page loads
    * - Click logo to return to homepage
    */
-  test('TC_BODY_002: Validate Private Wealth Section', async ({ page }) => {
+  test('TC_BODY_002: Validate Private Wealth Section', async ({ page }, testInfo) => {
     await homePage.scrollToPrivateWealth();
 
     const privateWealthHeading = page.getByRole('heading', {
@@ -56,10 +61,9 @@ test.describe('Body Content Tests', () => {
     }).first();
     await expect(privateWealthHeading).toBeVisible();
 
-    const privateWealthLearnMore = page.locator(
-      'xpath=//a[contains(@href,"/pws") and normalize-space(.)="Learn More"]'
-    ).first();
+    const privateWealthLearnMore = page.locator(`xpath=${XPATHS.home.privateWealthLearnMoreLink}`).first();
     await expect(privateWealthLearnMore).toBeVisible();
+    await captureStepScreenshot(page, testInfo, 'body-002-private-wealth-section', false);
 
     await Promise.all([
       page.waitForURL(/blackstone\.com\/(?:[a-z-]+\/)?pws\/?$/i),
@@ -67,7 +71,8 @@ test.describe('Body Content Tests', () => {
     ]);
 
     await expect(page).toHaveURL(/blackstone\.com\/(?:[a-z-]+\/)?pws\/?$/i);
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator(`xpath=${XPATHS.home.bodyElement}`)).toBeVisible();
+    await captureStepScreenshot(page, testInfo, 'body-002-private-wealth-destination', false);
 
     await homePage.clickLogoToHome();
     await page.waitForLoadState('domcontentloaded');
@@ -83,7 +88,7 @@ test.describe('Body Content Tests', () => {
    * - Verify four dates
    * - Verify links are clickable
    */
-  test('TC_BODY_003: Validate Featured Stories Section', async ({ page }) => {
+  test('TC_BODY_003: Validate Featured Stories Section', async ({ page }, testInfo) => {
     await homePage.scrollToFeaturedStories();
 
     const featuredStoriesHeading = await homePage.getFeaturedStoriesHeading();
@@ -98,6 +103,7 @@ test.describe('Body Content Tests', () => {
     await expect(storyImages).toHaveCount(4);
     await expect(storyDates).toHaveCount(4);
     await expect(storyLinks).toHaveCount(4);
+    await captureStepScreenshot(page, testInfo, 'body-003-featured-stories-section', true);
 
     const firstStoryHref = await storyLinks.first().getAttribute('href');
     expect(firstStoryHref).toContain('/insights/article/');
@@ -107,8 +113,9 @@ test.describe('Body Content Tests', () => {
       storyLinks.first().click()
     ]);
 
-    await expect(page.locator('body')).toBeVisible();
+    await expect(page.locator(`xpath=${XPATHS.home.bodyElement}`)).toBeVisible();
     await expect(page).toHaveURL(/blackstone\.com\/(?:[a-z-]+\/)?insights\/article\//i);
+    await captureStepScreenshot(page, testInfo, 'body-003-featured-story-article', false);
 
     await homePage.clickLogoToHome();
     await page.waitForLoadState('domcontentloaded');
